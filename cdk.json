@@ -1,0 +1,22 @@
+{
+  "app": "npx ts-node bin/app.ts",
+  "watch": {
+    "include": ["**"],
+    "exclude": [
+      "README.md",
+      "cdk*.json",
+      "**/*.d.ts",
+      "**/*.js",
+      "tsconfig.json",
+      "package*.json",
+      "node_modules",
+      "test",
+      "dist"
+    ]
+  },
+  "context": {
+    "account": "PLACEHOLDER_ACCOUNT_ID",
+    "region": "us-east-1",
+    "databricksEndpoint": "https://PLACEHOLDER.databricks.com"
+  }
+}

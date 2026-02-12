@@ -1,0 +1,26 @@
+{
+  "name": "agentcore",
+  "version": "0.1.0",
+  "bin": {
+    "agentcore": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "test": "vitest --run"
+  },
+  "devDependencies": {
+    "@fast-check/vitest": "^0.2.4",
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.175.0",
+    "fast-check": "^3.23.0",
+    "typescript": "~5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.986.0",
+    "aws-cdk-lib": "^2.175.0",
+    "constructs": "^10.4.0"
+  }
+}
