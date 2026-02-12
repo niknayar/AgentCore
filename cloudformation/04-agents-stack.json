@@ -1,0 +1,297 @@
+{
+ "Resources": {
+  "CollaboratorAgentRole2A8E99DE": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "bedrock.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": "bedrock:InvokeModel",
+         "Effect": "Allow",
+         "Resource": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-*"
+        },
+        {
+         "Action": "lambda:InvokeFunction",
+         "Effect": "Allow",
+         "Resource": {
+          "Fn::ImportValue": "ComputeStack:ExportsOutputFnGetAttBusinessLogicFunctionD9B07307Arn82EB32E2"
+         }
+        }
+       ],
+       "Version": "2012-10-17"
+      },
+      "PolicyName": "BedrockInvoke"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AgentsStack/CollaboratorAgentRole/Resource"
+   }
+  },
+  "GatewayTargetAgent": {
+   "Type": "AWS::Bedrock::Agent",
+   "Properties": {
+    "ActionGroups": [
+     {
+      "ActionGroupExecutor": {
+       "Lambda": {
+        "Fn::ImportValue": "ComputeStack:ExportsOutputFnGetAttBusinessLogicFunctionD9B07307Arn82EB32E2"
+       }
+      },
+      "ActionGroupName": "BusinessProcessing",
+      "Description": "Business processing action group for evaluating submissions via Lambda",
+      "FunctionSchema": {
+       "Functions": [
+        {
+         "Description": "Evaluate a package submission against configured business rules",
+         "Name": "evaluateSubmission",
+         "Parameters": {
+          "submissionId": {
+           "Description": "Unique submission identifier",
+           "Required": true,
+           "Type": "string"
+          },
+          "fields": {
+           "Description": "JSON-encoded submission fields",
+           "Required": true,
+           "Type": "string"
+          }
+         }
+        }
+       ]
+      }
+     }
+    ],
+    "AgentName": "agentcore-gateway-target",
+    "AgentResourceRoleArn": {
+     "Fn::GetAtt": [
+      "CollaboratorAgentRole2A8E99DE",
+      "Arn"
+     ]
+    },
+    "AutoPrepare": true,
+    "FoundationModel": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "Instruction": "You are the Gateway Target Agent. Orchestrate package processing by determining required steps, invoking business logic, accessing storage, querying legacy data via MCP, and executing custom tools as needed. Return consolidated results.",
+    "MemoryConfiguration": {
+     "EnabledMemoryTypes": [
+      "SESSION_SUMMARY"
+     ],
+     "SessionSummaryConfiguration": {
+      "MaxRecentSessions": 5
+     },
+     "StorageDays": 30
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AgentsStack/GatewayTargetAgent"
+   }
+  },
+  "CollaboratorAgentAlias": {
+   "Type": "AWS::Bedrock::AgentAlias",
+   "Properties": {
+    "AgentAliasName": "live",
+    "AgentId": {
+     "Fn::GetAtt": [
+      "GatewayTargetAgent",
+      "AgentId"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AgentsStack/CollaboratorAgentAlias"
+   }
+  },
+  "SupervisorAgentRole65A1876C": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "bedrock.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": "bedrock:InvokeModel",
+         "Effect": "Allow",
+         "Resource": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-*"
+        },
+        {
+         "Action": "bedrock:InvokeAgent",
+         "Effect": "Allow",
+         "Resource": "*"
+        }
+       ],
+       "Version": "2012-10-17"
+      },
+      "PolicyName": "BedrockInvoke"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "AgentsStack/SupervisorAgentRole/Resource"
+   }
+  },
+  "CoreGatewayAgent": {
+   "Type": "AWS::Bedrock::Agent",
+   "Properties": {
+    "AgentCollaboration": "SUPERVISOR_ROUTER",
+    "AgentCollaborators": [
+     {
+      "AgentDescriptor": {
+       "AliasArn": {
+        "Fn::GetAtt": [
+         "CollaboratorAgentAlias",
+         "AgentAliasArn"
+        ]
+       }
+      },
+      "CollaborationInstruction": "Route package submissions to this collaborator for business logic processing, storage operations, and MCP server interactions.",
+      "CollaboratorName": "GatewayTargetAgent",
+      "RelayConversationHistory": "TO_COLLABORATOR"
+     }
+    ],
+    "AgentName": "agentcore-core-gateway",
+    "AgentResourceRoleArn": {
+     "Fn::GetAtt": [
+      "SupervisorAgentRole65A1876C",
+      "Arn"
+     ]
+    },
+    "AutoPrepare": true,
+    "FoundationModel": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "Instruction": "You are the Core Gateway Agent (supervisor). Validate authenticated user identity from session attributes, route package submissions to the Gateway Target Agent collaborator, and reject unauthenticated requests."
+   },
+   "Metadata": {
+    "aws:cdk:path": "AgentsStack/CoreGatewayAgent"
+   }
+  },
+  "SupervisorAgentAlias": {
+   "Type": "AWS::Bedrock::AgentAlias",
+   "Properties": {
+    "AgentAliasName": "live",
+    "AgentId": {
+     "Fn::GetAtt": [
+      "CoreGatewayAgent",
+      "AgentId"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "AgentsStack/SupervisorAgentAlias"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/zWNQQ7CIBBFz+Iexko3bhsPYFIPYCiMZgoFUwa7INy9NMbVe/9tvgLVX6E76S1JY530NEF5sDZOtPQspBcoY/Qobq9wsIoJ7RqNg9LK8MbA4i+DJ51qPfY98ydzFSFahDmdv6qHS9eO5kQk1xyYFoTxxx2n4bxAhQAAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "AgentsStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "SupervisorAgentId": {
+   "Value": {
+    "Fn::GetAtt": [
+     "CoreGatewayAgent",
+     "AgentId"
+    ]
+   },
+   "Export": {
+    "Name": "AgentCoreSupervisorAgentId"
+   }
+  },
+  "SupervisorAgentAliasId": {
+   "Value": {
+    "Fn::GetAtt": [
+     "SupervisorAgentAlias",
+     "AgentAliasId"
+    ]
+   },
+   "Export": {
+    "Name": "AgentCoreSupervisorAgentAliasId"
+   }
+  },
+  "ExportsOutputFnGetAttCoreGatewayAgentAgentId2447DF6E": {
+   "Value": {
+    "Fn::GetAtt": [
+     "CoreGatewayAgent",
+     "AgentId"
+    ]
+   },
+   "Export": {
+    "Name": "AgentsStack:ExportsOutputFnGetAttCoreGatewayAgentAgentId2447DF6E"
+   }
+  },
+  "ExportsOutputFnGetAttSupervisorAgentAliasAgentAliasId1B9350E5": {
+   "Value": {
+    "Fn::GetAtt": [
+     "SupervisorAgentAlias",
+     "AgentAliasId"
+    ]
+   },
+   "Export": {
+    "Name": "AgentsStack:ExportsOutputFnGetAttSupervisorAgentAliasAgentAliasId1B9350E5"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

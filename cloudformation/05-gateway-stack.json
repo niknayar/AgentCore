@@ -1,0 +1,390 @@
+{
+ "Resources": {
+  "AgentCoreApiA7344470": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Description": "API Gateway for AgentCore Bedrock agent invocation",
+    "Name": "agentcore-api"
+   },
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/Resource"
+   }
+  },
+  "AgentCoreApiCloudWatchRoleCEC291F5": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "apigateway.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+       ]
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/CloudWatchRole/Resource"
+   }
+  },
+  "AgentCoreApiAccount0E6AD8BA": {
+   "Type": "AWS::ApiGateway::Account",
+   "Properties": {
+    "CloudWatchRoleArn": {
+     "Fn::GetAtt": [
+      "AgentCoreApiCloudWatchRoleCEC291F5",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "AgentCoreApiA7344470"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/Account"
+   }
+  },
+  "AgentCoreApiDeployment449252CB130946426b09d4e154f1b8940785b001": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "API Gateway for AgentCore Bedrock agent invocation",
+    "RestApiId": {
+     "Ref": "AgentCoreApiA7344470"
+    }
+   },
+   "DependsOn": [
+    "AgentCoreApiagentinvokePOST70A6980F",
+    "AgentCoreApiagentinvoke6DA514C0",
+    "AgentCoreApiagent13716C12"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "AgentCoreApiDeploymentStageprodC10E3AFC": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "AgentCoreApiDeployment449252CB130946426b09d4e154f1b8940785b001"
+    },
+    "RestApiId": {
+     "Ref": "AgentCoreApiA7344470"
+    },
+    "StageName": "prod"
+   },
+   "DependsOn": [
+    "AgentCoreApiAccount0E6AD8BA"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/DeploymentStage.prod/Resource"
+   }
+  },
+  "AgentCoreApiagent13716C12": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "AgentCoreApiA7344470",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "agent",
+    "RestApiId": {
+     "Ref": "AgentCoreApiA7344470"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/Default/agent/Resource"
+   }
+  },
+  "AgentCoreApiagentinvoke6DA514C0": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Ref": "AgentCoreApiagent13716C12"
+    },
+    "PathPart": "invoke",
+    "RestApiId": {
+     "Ref": "AgentCoreApiA7344470"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/Default/agent/invoke/Resource"
+   }
+  },
+  "AgentCoreApiagentinvokePOST70A6980F": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "COGNITO_USER_POOLS",
+    "AuthorizerId": {
+     "Ref": "CognitoAuthorizerF3215DBC"
+    },
+    "HttpMethod": "POST",
+    "Integration": {
+     "Credentials": {
+      "Fn::GetAtt": [
+       "ApiGatewayBedrockRole46FE7649",
+       "Arn"
+      ]
+     },
+     "IntegrationHttpMethod": "POST",
+     "IntegrationResponses": [
+      {
+       "ResponseTemplates": {
+        "application/json": "$input.json('$')"
+       },
+       "StatusCode": "200"
+      },
+      {
+       "ResponseTemplates": {
+        "application/json": "{\"error\": \"Bad request\"}"
+       },
+       "SelectionPattern": "4\\d{2}",
+       "StatusCode": "400"
+      },
+      {
+       "ResponseTemplates": {
+        "application/json": "{\"error\": \"Service unavailable\"}"
+       },
+       "SelectionPattern": "5\\d{2}",
+       "StatusCode": "503"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": {
+       "Fn::Join": [
+        "",
+        [
+         "{\"agentId\":\"",
+         {
+          "Fn::ImportValue": "AgentsStack:ExportsOutputFnGetAttCoreGatewayAgentAgentId2447DF6E"
+         },
+         "\",\"agentAliasId\":\"",
+         {
+          "Fn::ImportValue": "AgentsStack:ExportsOutputFnGetAttSupervisorAgentAliasAgentAliasId1B9350E5"
+         },
+         "\",\"sessionId\":\"$context.requestId\",\"inputText\":\"$input.path('$.inputText')\"}"
+        ]
+       ]
+      }
+     },
+     "Type": "AWS",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:us-east-1:bedrock-agent-runtime:action/InvokeAgent"
+       ]
+      ]
+     }
+    },
+    "MethodResponses": [
+     {
+      "StatusCode": "200"
+     },
+     {
+      "StatusCode": "400"
+     },
+     {
+      "StatusCode": "503"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "AgentCoreApiagentinvoke6DA514C0"
+    },
+    "RestApiId": {
+     "Ref": "AgentCoreApiA7344470"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/AgentCoreApi/Default/agent/invoke/POST/Resource"
+   }
+  },
+  "CognitoAuthorizerF3215DBC": {
+   "Type": "AWS::ApiGateway::Authorizer",
+   "Properties": {
+    "IdentitySource": "method.request.header.Authorization",
+    "Name": "agentcore-cognito-authorizer",
+    "ProviderARNs": [
+     {
+      "Fn::ImportValue": "AuthStack:ExportsOutputFnGetAttAgentCoreUserPool3B4A21F6Arn53F38342"
+     }
+    ],
+    "RestApiId": {
+     "Ref": "AgentCoreApiA7344470"
+    },
+    "Type": "COGNITO_USER_POOLS"
+   },
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/CognitoAuthorizer/Resource"
+   }
+  },
+  "ApiGatewayBedrockRole46FE7649": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "apigateway.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Policies": [
+     {
+      "PolicyDocument": {
+       "Statement": [
+        {
+         "Action": "bedrock:InvokeAgent",
+         "Effect": "Allow",
+         "Resource": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:aws:bedrock:us-east-1:PLACEHOLDER_ACCOUNT_ID:agent-alias/",
+            {
+             "Fn::ImportValue": "AgentsStack:ExportsOutputFnGetAttCoreGatewayAgentAgentId2447DF6E"
+            },
+            "/",
+            {
+             "Fn::ImportValue": "AgentsStack:ExportsOutputFnGetAttSupervisorAgentAliasAgentAliasId1B9350E5"
+            }
+           ]
+          ]
+         }
+        }
+       ],
+       "Version": "2012-10-17"
+      },
+      "PolicyName": "InvokeBedrockAgent"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/ApiGatewayBedrockRole/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02Pyw6CMBBFv8V9qQgbt6hbo8G4NrWMOPIY0ocECf/uIL5Wc+5JenMbySheynCmWhvorAhKPMv+4JQuBKtTrxrMlYNWdbJPwbqkQbG+1H+YaE2+dmIDTUldBYxs/xK35TC6CfgpeaNhpewvvDsn3oK7UjaqD1Feo6OjBbMnKm3iWRt8gHkN+KZBoKp4J5VTId9hGGnnXePdIGrKQN7s/B7FchHyt28WMTA8HyuQ6XSfX7s5cRMBAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "GatewayStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AgentCoreApiEndpointFB9A210F": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "AgentCoreApiA7344470"
+      },
+      ".execute-api.us-east-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AgentCoreApiDeploymentStageprodC10E3AFC"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "ApiUrl": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "AgentCoreApiA7344470"
+      },
+      ".execute-api.us-east-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "AgentCoreApiDeploymentStageprodC10E3AFC"
+      },
+      "/"
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "AgentCoreApiUrl"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
