@@ -1,0 +1,393 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "IAM Role for AgentCore CloudFormation deployment. Deploy this stack first, then use the role ARN for all subsequent stack deployments.",
+  "Parameters": {
+    "TrustedAccountId": {
+      "Type": "String",
+      "Description": "AWS Account ID allowed to assume this deployment role",
+      "AllowedPattern": "^[0-9]{12}$",
+      "ConstraintDescription": "Must be a 12-digit AWS account ID"
+    },
+    "TrustedPrincipalArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional: specific IAM user/role ARN to trust (e.g. arn:aws:iam::123456789012:role/CICDRole). If empty, the entire account is trusted."
+    }
+  },
+  "Conditions": {
+    "HasSpecificPrincipal": {
+      "Fn::Not": [{ "Fn::Equals": [{ "Ref": "TrustedPrincipalArn" }, ""] }]
+    }
+  },
+  "Resources": {
+    "AgentCoreDeploymentRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "AgentCoreCloudFormationDeployRole",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudformation.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            },
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::If": [
+                    "HasSpecificPrincipal",
+                    { "Ref": "TrustedPrincipalArn" },
+                    { "Fn::Sub": "arn:aws:iam::${TrustedAccountId}:root" }
+                  ]
+                }
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [],
+        "Policies": [
+          {
+            "PolicyName": "AgentCoreCognitoPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "Cognito",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cognito-idp:CreateUserPool",
+                    "cognito-idp:DeleteUserPool",
+                    "cognito-idp:UpdateUserPool",
+                    "cognito-idp:DescribeUserPool",
+                    "cognito-idp:CreateUserPoolClient",
+                    "cognito-idp:DeleteUserPoolClient",
+                    "cognito-idp:UpdateUserPoolClient",
+                    "cognito-idp:DescribeUserPoolClient",
+                    "cognito-idp:TagResource",
+                    "cognito-idp:UntagResource"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreS3Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "S3",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:CreateBucket",
+                    "s3:DeleteBucket",
+                    "s3:PutBucketPolicy",
+                    "s3:DeleteBucketPolicy",
+                    "s3:GetBucketPolicy",
+                    "s3:PutBucketVersioning",
+                    "s3:PutEncryptionConfiguration",
+                    "s3:PutLifecycleConfiguration",
+                    "s3:PutBucketCORS",
+                    "s3:PutBucketPublicAccessBlock",
+                    "s3:GetBucketLocation",
+                    "s3:GetBucketVersioning",
+                    "s3:GetEncryptionConfiguration",
+                    "s3:GetLifecycleConfiguration",
+                    "s3:GetBucketCORS",
+                    "s3:GetBucketPublicAccessBlock",
+                    "s3:PutBucketTagging",
+                    "s3:GetBucketTagging",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket",
+                    "s3:PutBucketWebsite",
+                    "s3:GetBucketWebsite"
+                  ],
+                  "Resource": "arn:aws:s3:::agentcore-*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreLambdaPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "Lambda",
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:CreateFunction",
+                    "lambda:DeleteFunction",
+                    "lambda:UpdateFunctionCode",
+                    "lambda:UpdateFunctionConfiguration",
+                    "lambda:GetFunction",
+                    "lambda:GetFunctionConfiguration",
+                    "lambda:AddPermission",
+                    "lambda:RemovePermission",
+                    "lambda:TagResource",
+                    "lambda:UntagResource",
+                    "lambda:ListTags",
+                    "lambda:PublishVersion",
+                    "lambda:CreateAlias",
+                    "lambda:DeleteAlias",
+                    "lambda:UpdateAlias"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:lambda:*:${TrustedAccountId}:function:*"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreBedrockPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "Bedrock",
+                  "Effect": "Allow",
+                  "Action": [
+                    "bedrock:CreateAgent",
+                    "bedrock:DeleteAgent",
+                    "bedrock:UpdateAgent",
+                    "bedrock:GetAgent",
+                    "bedrock:CreateAgentAlias",
+                    "bedrock:DeleteAgentAlias",
+                    "bedrock:UpdateAgentAlias",
+                    "bedrock:GetAgentAlias",
+                    "bedrock:CreateAgentActionGroup",
+                    "bedrock:DeleteAgentActionGroup",
+                    "bedrock:UpdateAgentActionGroup",
+                    "bedrock:AssociateAgentCollaborator",
+                    "bedrock:DisassociateAgentCollaborator",
+                    "bedrock:PrepareAgent",
+                    "bedrock:TagResource",
+                    "bedrock:UntagResource",
+                    "bedrock:CreateAgentCoreGateway",
+                    "bedrock:DeleteAgentCoreGateway",
+                    "bedrock:UpdateAgentCoreGateway",
+                    "bedrock:GetAgentCoreGateway",
+                    "bedrock:CreateGatewayTarget",
+                    "bedrock:DeleteGatewayTarget",
+                    "bedrock:UpdateGatewayTarget"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreAPIGatewayPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "APIGateway",
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:POST",
+                    "apigateway:GET",
+                    "apigateway:PUT",
+                    "apigateway:DELETE",
+                    "apigateway:PATCH",
+                    "apigateway:TagResource",
+                    "apigateway:UntagResource"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:apigateway:*::/*"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreIAMPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "IAMRoles",
+                  "Effect": "Allow",
+                  "Action": [
+                    "iam:CreateRole",
+                    "iam:DeleteRole",
+                    "iam:GetRole",
+                    "iam:PutRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:GetRolePolicy",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
+                    "iam:PassRole",
+                    "iam:TagRole",
+                    "iam:UntagRole",
+                    "iam:ListRolePolicies",
+                    "iam:ListAttachedRolePolicies"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:iam::${TrustedAccountId}:role/AgentCore*"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreCloudWatchPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "CloudWatch",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudwatch:PutDashboard",
+                    "cloudwatch:DeleteDashboards",
+                    "cloudwatch:GetDashboard",
+                    "cloudwatch:PutMetricAlarm",
+                    "cloudwatch:DeleteAlarms",
+                    "cloudwatch:DescribeAlarms",
+                    "cloudwatch:TagResource",
+                    "cloudwatch:UntagResource",
+                    "logs:CreateLogGroup",
+                    "logs:DeleteLogGroup",
+                    "logs:PutRetentionPolicy",
+                    "logs:TagResource",
+                    "logs:UntagResource",
+                    "logs:DescribeLogGroups"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreCFNPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "CloudFormation",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:CreateStack",
+                    "cloudformation:UpdateStack",
+                    "cloudformation:DeleteStack",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:DescribeStackEvents",
+                    "cloudformation:GetTemplate",
+                    "cloudformation:ListStackResources",
+                    "cloudformation:CreateChangeSet",
+                    "cloudformation:ExecuteChangeSet",
+                    "cloudformation:DeleteChangeSet",
+                    "cloudformation:DescribeChangeSet"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/AgentCore*/*"
+                  }
+                },
+                {
+                  "Sid": "CloudFormationAllStacks",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:CreateStack",
+                    "cloudformation:UpdateStack",
+                    "cloudformation:DeleteStack",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:DescribeStackEvents",
+                    "cloudformation:GetTemplate",
+                    "cloudformation:ListStackResources"
+                  ],
+                  "Resource": [
+                    { "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/AuthStack/*" },
+                    { "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/StorageStack/*" },
+                    { "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/ComputeStack/*" },
+                    { "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/AgentsStack/*" },
+                    { "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/GatewayStack/*" },
+                    { "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/ObservabilityStack/*" },
+                    { "Fn::Sub": "arn:aws:cloudformation:*:${TrustedAccountId}:stack/CloudFrontStack/*" }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreSecretsManagerPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "SecretsManager",
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue",
+                    "secretsmanager:DescribeSecret"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:aws:secretsmanager:*:${TrustedAccountId}:secret:databricks-*"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "AgentCoreCloudFrontPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "CloudFront",
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudfront:CreateDistribution",
+                    "cloudfront:UpdateDistribution",
+                    "cloudfront:DeleteDistribution",
+                    "cloudfront:GetDistribution",
+                    "cloudfront:GetDistributionConfig",
+                    "cloudfront:TagResource",
+                    "cloudfront:UntagResource",
+                    "cloudfront:CreateOriginAccessControl",
+                    "cloudfront:DeleteOriginAccessControl",
+                    "cloudfront:GetOriginAccessControl",
+                    "cloudfront:UpdateOriginAccessControl",
+                    "cloudfront:CreateCachePolicy",
+                    "cloudfront:DeleteCachePolicy",
+                    "cloudfront:GetCachePolicy",
+                    "cloudfront:UpdateCachePolicy",
+                    "cloudfront:CreateResponseHeadersPolicy",
+                    "cloudfront:DeleteResponseHeadersPolicy",
+                    "cloudfront:GetResponseHeadersPolicy",
+                    "cloudfront:UpdateResponseHeadersPolicy",
+                    "cloudfront:CreateInvalidation"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          { "Key": "Project", "Value": "AgentCore" },
+          { "Key": "ManagedBy", "Value": "CloudFormation" }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "DeploymentRoleArn": {
+      "Description": "ARN of the CloudFormation deployment role. Use this with --role-arn in CDK deploy.",
+      "Value": { "Fn::GetAtt": ["AgentCoreDeploymentRole", "Arn"] },
+      "Export": { "Name": "AgentCore-DeploymentRoleArn" }
+    },
+    "DeploymentRoleName": {
+      "Description": "Name of the deployment role",
+      "Value": { "Ref": "AgentCoreDeploymentRole" }
+    }
+  }
+}
